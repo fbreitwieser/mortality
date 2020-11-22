@@ -29,7 +29,7 @@ ui <- fluidPage(
       shiny::selectInput(inputId = "age_group", 
                          label = "Age Group",
                          choices = all_age_groups,
-			 selected = all_age_groups,
+			 selected = c("15_64", "65_74", "75_84", "85p"),
                          multiple = TRUE),
 
       shiny::radioButtons(inputId = "sex", 
