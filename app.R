@@ -12,16 +12,12 @@ stmf$AgeGroup <- sub("^[DR]", "", stmf$AgeGroup)
 all_age_groups <- unique(stmf$AgeGroup)
 all_countries <- unique(stmf$CountryCode)
 
-# Define UI for app that draws a histogram ----
 ui <- fluidPage(
 
-  # App title ----
-  titlePanel("Hello Shiny!"),
+  titlePanel("Weekly mortality data in Europe"),
 
-  # Sidebar layout with input and output definitions ----
   sidebarLayout(
 
-    # Sidebar panel for inputs ----
     sidebarPanel(
 
       shiny::selectInput(inputId = "country", 
@@ -49,10 +45,8 @@ ui <- fluidPage(
 			   label = "Normalize counts"),
     ),
 
-    # Main panel for displaying outputs ----
     mainPanel(
 
-      # Output: Histogram ----
       plotOutput(outputId = "distPlot")
 
     )
