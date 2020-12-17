@@ -1,6 +1,8 @@
 library(shiny)
 library(ggplot2)
 library(cowplot)
+library(magrittr)
+library(DT)
 
 
 stmf <- read.csv("stmf.csv", skip = 2, stringsAsFactors = F)
@@ -47,13 +49,36 @@ ui <- fluidPage(
 
     mainPanel(
 
-      plotOutput(outputId = "distPlot")
+      plotOutput(outputId = "distPlot"),
+      DTOutput(outputId = "dat")
 
     )
   )
 )
 
 server <- function(input, output) {
+
+  
+
+  output$dat <- renderDT({
+    country <- input$country
+    dat <- subset(stmf, CountryCode %in% country & Sex == input$sex)
+
+    dat <- plyr::ddply(dat, c("CountryCode", "AgeGroup", "Type", "Sex", "Week"), function(x) {
+        x$NormalDeaths <- mean(x$Deaths[x$Year %in% c(2016,2017,2018,2019)])
+        x$AdditionalDeaths <- x$Deaths - x$NormalDeaths
+        x[x$Year == 2020,]
+    })
+    max_week = min(tapply(dat$Week, dat$CountryCode, max))
+    print(tapply(dat$Week, dat$CountryCode, max))
+    message("max_week: ", max_week)
+
+    #tapply(dat$Deaths, dat$
+    plyr::daply(subset(dat, Week <= max_week), c("AgeGroup", "CountryCode"), function(x) {
+	sprintf("%.f (%.2f%%)", sum(x$AdditionalDeaths),100*sum(x$AdditionalDeaths)/sum(x$NormalDeaths))
+    })
+
+  })
 
 
   output$distPlot <- renderPlot({
