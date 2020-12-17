@@ -45,6 +45,8 @@ ui <- fluidPage(
 			 selected = "D"),
       shiny::checkboxInput(inputId = "normalize",
 			   label = "Normalize counts"),
+      "Week of latest data in 2020 per country:",
+      tableOutput(outputId = "dat_info")
     ),
 
     mainPanel(
@@ -56,25 +58,30 @@ ui <- fluidPage(
   )
 )
 
+
 server <- function(input, output) {
 
-  
-
-  output$dat <- renderDT({
-    country <- input$country
-    dat <- subset(stmf, CountryCode %in% country & Sex == input$sex)
-
-    dat <- plyr::ddply(dat, c("CountryCode", "AgeGroup", "Type", "Sex", "Week"), function(x) {
+  stmfi <- reactive({
+    dat <- subset(stmf, CountryCode %in% input$country & Sex == input$sex)
+    plyr::ddply(dat, c("CountryCode", "AgeGroup", "Type", "Sex", "Week"), function(x) {
         x$NormalDeaths <- mean(x$Deaths[x$Year %in% c(2016,2017,2018,2019)])
         x$AdditionalDeaths <- x$Deaths - x$NormalDeaths
-        x[x$Year == 2020,]
-    })
-    max_week = min(tapply(dat$Week, dat$CountryCode, max))
-    print(tapply(dat$Week, dat$CountryCode, max))
-    message("max_week: ", max_week)
+        x
+})
+  })
+
+  output$dat_info <- renderTable({
+    dat <- subset(stmfi(), Year == 2020)
+    data.frame(WeekNr=tapply(dat$Week, dat$CountryCode, max))
+  }, rownames=TRUE)
+
+  output$dat <- renderDT({
+    dat <- subset(stmfi(), Year == 2020)
 
     #tapply(dat$Deaths, dat$
-    plyr::daply(subset(dat, Week <= max_week), c("AgeGroup", "CountryCode"), function(x) {
+    plyr::daply(dat, c("AgeGroup", "CountryCode"), function(x) {
+	# Exclude the data from the last week
+	x <- x[x$Week < max(x$Week), ]
 	sprintf("%.f (%.2f%%)", sum(x$AdditionalDeaths),100*sum(x$AdditionalDeaths)/sum(x$NormalDeaths))
     })
 
@@ -83,8 +90,11 @@ server <- function(input, output) {
 
   output$distPlot <- renderPlot({
 
+    dat <- subset(stmfi(), AgeGroup %in% input$age_group  & Type == input$type & Sex == input$sex)
+
     country <- input$country
-    dat <- subset(stmf, CountryCode %in% country & AgeGroup %in% input$age_group & Type == input$type & Sex == input$sex)
+
+    # Shift week slightly for better readability
     country_plus <- setNames((seq_along(country) - 1)/length(country), sort(country))
     dat$Week <- dat$Week + country_plus[dat$Country]
  
