@@ -10,5 +10,5 @@ R> shiny::runApp()
 
 Update data from mortality.org:
 ```
-curl https://www.mortality.org/Public/STMF/Outputs/stmf.csv > smtf.csv
+curl https://www.mortality.org/Public/STMF/Outputs/stmf.csv > stmf.csv
 ```
