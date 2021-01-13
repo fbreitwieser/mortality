@@ -4,15 +4,78 @@ library(cowplot)
 library(magrittr)
 library(DT)
 
+# Remap HMD names
+country_map <- 
+	c(AUS = "Australia",
+	  AUS2 = "Australia",
+	  AUT = "Austria",
+	  BLR = "Belarus",
+	  BEL = "Belgium",
+	  BGR = "Bulgaria",
+	  CAN = "Canada",
+	  CHL = "Chile",
+	  HRV = "Croatia",
+	  CZE = "Czechia",
+	  DNK = "Denmark",
+	  EST = "Estonia",
+	  FIN = "Finland",
+	  FRATNP = "France",
+	  FRACNP = "France Civ",
+	  DEUTNP = "Germany",
+	  DEUTE = "East Germany",
+	  DEUTW = "West Germany",
+	  GRC = "Greece",
+	  HKG = "Hong Kong",
+	  HUN = "Hungary",
+	  ISL = "Iceland",
+	  Ireland = "IRE",
+	  ISR = "Israel",
+	  ITA = "Italy",
+	  JPN = "Japan",
+	  LVA = "Latvia",
+	  LTU = "Lithuania",
+	  LUX = "Luxembourg",
+	  NLD = "Netherlands",
+	  NZL_NP = "New Zealand",
+	  NZL_MA = "New Zealand (Maori)",
+	  NZL_NM = "New Zealand (Non-Maori)",
+	  NOR = "Norway",
+	  POL = "Poland",
+	  PRT = "Portugal",
+	  KOR = "Republic of Korea",
+	  RUS = "Russia",
+	  SVK = "Slovakia",
+	  SVN = "Slovenia",
+	  ESP = "Spain",
+	  SWE = "Sweden",
+	  CHE = "Switzerland",
+	  TWN = "Taiwan",
+	  GBR_NP = "U.K.",
+	  GBRTENW = "England & Wales",
+	  GBRCENW = "England & Wales Civ",
+	  GBR_SCO = "Scotland",
+	  GBR_NIR = "Northern Ireland",
+	  USA = "USA",
+	  UKR = "Ukraine")
+
+age_map <- c(
+	     "0_14" = "Age 0 - 14",
+	     "15_64" = "Age 15 - 64",
+	     "65_74" = "Age 65 - 74",
+	     "75_84" = "Age 75 - 84",
+	     "85p" = "Age 85+",
+	     "Total" = "Total")
 
 stmf <- read.csv("stmf.csv", skip = 2, stringsAsFactors = F)
 
 stmf <- tidyr::gather(stmf, AgeGroup, Deaths, D0_14:RTotal) 
 stmf$Type <- substr(stmf$AgeGroup, 0, 1)
-stmf$AgeGroup <- sub("^[DR]", "", stmf$AgeGroup)
+stmf$AgeGroup <- age_map[sub("^[DR]", "", stmf$AgeGroup)]
+stmf$Country <- country_map[stmf$CountryCode]
 
 all_age_groups <- unique(stmf$AgeGroup)
-all_countries <- unique(stmf$CountryCode)
+all_countries <- unique(stmf$Country)
+
 
 ui <- fluidPage(
 
@@ -25,13 +88,13 @@ ui <- fluidPage(
       shiny::selectInput(inputId = "country", 
                          label = "Country",
                          choices = all_countries,
-			 selected = c("AUT", "CHE", "CZE"),
+			 selected = c("Germany", "Italy", "USA"),
                          multiple = TRUE),
 
       shiny::selectInput(inputId = "age_group", 
                          label = "Age Group",
                          choices = all_age_groups,
-			 selected = c("15_64", "65_74", "75_84", "85p"),
+			 selected = c("Age 15 - 64", "Age 65 - 74", "Age 75 - 84", "Age 85+"),
                          multiple = TRUE),
 
       shiny::radioButtons(inputId = "sex", 
@@ -42,18 +105,27 @@ ui <- fluidPage(
       shiny::radioButtons(inputId = "type", 
                          label = "Type",
                          choices = c(Deaths="D", "Mortality rate (Deaths/1k/week)"="R"),
-			 selected = "D"),
+			 selected = "R"),
       shiny::checkboxInput(inputId = "normalize",
-			   label = "Normalize counts"),
-      "Week of latest data in 2020 per country:",
-      tableOutput(outputId = "dat_info")
+			   label = "Normalize graphs based on 2015-2019 data"),
+      shiny::checkboxInput(inputId = "start_at_zero",
+			   label = "Start y-axis at zero",
+			   value = TRUE)
     ),
 
     mainPanel(
-
-      plotOutput(outputId = "distPlot"),
-      DTOutput(outputId = "dat")
-
+      tabsetPanel(type="tabs",
+         tabPanel("Mortality plot",
+                  plotOutput(outputId = "distPlot")),
+	 tabPanel("Excess mortality in 2020",
+                  DTOutput(outputId = "dat"),
+	          "Numbers are showing the difference in the number of deaths in 2020 compared to the average number of deaths in 2015 - 2019"),
+         tabPanel("Data", 
+      		shiny::radioButtons(inputId = "year2", label = "Year",
+					 choices=2015:2020), 
+		  DTOutput(outputId = "dat2")
+	 )
+	 )
     )
   )
 )
@@ -62,8 +134,8 @@ ui <- fluidPage(
 server <- function(input, output) {
 
   stmfi <- reactive({
-    dat <- subset(stmf, CountryCode %in% input$country & Sex == input$sex)
-    plyr::ddply(dat, c("CountryCode", "AgeGroup", "Type", "Sex", "Week"), function(x) {
+    dat <- subset(stmf, Country%in% input$country & Sex == input$sex)
+    plyr::ddply(dat, c("Country", "AgeGroup", "Type", "Sex", "Week"), function(x) {
         x$NormalDeaths <- mean(x$Deaths[x$Year %in% c(2016,2017,2018,2019)])
         x$AdditionalDeaths <- x$Deaths - x$NormalDeaths
         x
@@ -72,18 +144,40 @@ server <- function(input, output) {
 
   output$dat_info <- renderTable({
     dat <- subset(stmfi(), Year == 2020)
-    data.frame(WeekNr=tapply(dat$Week, dat$CountryCode, max))
+    data.frame(WeekNr=tapply(dat$Week, dat$Country, max))
   }, rownames=TRUE)
+
+  output$dat2 <- renderDT({
+    dat <- subset(stmf, Year == input$year2)
+    male <- subset(dat, Sex == "m")
+    female <- subset(dat, Sex == "f")
+
+    plyr::ddply(data.frame(Country = male$Country,
+			   AgeGroup = male$AgeGroup,
+			   MaleDeaths = male$Deaths,
+			   FemaleDeaths = female$Deaths),
+		c("Country"),
+	function(x) {
+		tapply(x$MaleDeaths/x$FemaleDeaths,
+		       x$AgeGroup,
+		       function(y) { round(mean(y[is.finite(y)],na.rm=T), 2) }
+		       )
+    })
+
+  })
 
   output$dat <- renderDT({
     dat <- subset(stmfi(), Year == 2020)
 
     #tapply(dat$Deaths, dat$
-    plyr::daply(dat, c("AgeGroup", "CountryCode"), function(x) {
+    dat1 <- plyr::daply(dat, c("AgeGroup", "Country"), function(x) {
 	# Exclude the data from the last week
 	x <- x[x$Week < max(x$Week), ]
 	sprintf("%.f (%.2f%%)", sum(x$AdditionalDeaths),100*sum(x$AdditionalDeaths)/sum(x$NormalDeaths))
     })
+
+    rbind(Data=sprintf("Week 1-%s",tapply(dat$Week, dat$Country, max)),
+          dat1)
 
   })
 
@@ -99,12 +193,17 @@ server <- function(input, output) {
     dat$Week <- dat$Week + country_plus[dat$Country]
  
     if (input$normalize) {
-      dat <- plyr::ddply(dat, c("CountryCode", "AgeGroup", "Type", "Sex", "Week"), function(x) {
+      dat <- plyr::ddply(dat, c("Country", "AgeGroup", "Type", "Sex", "Week"), function(x) {
         x$Deaths <- x$Deaths - mean(x$Deaths[x$Year %in% c(2016,2017,2018,2019)])
         x
       })
     }
-    ggplot(subset(dat, Year == 2020),aes(x=Week, y=Deaths, color = CountryCode)) +
+    g <- ggplot(subset(dat, Year == 2020),aes(x=Week, y=Deaths, color = Country))
+   
+    if (input$start_at_zero) {
+        g <- g + expand_limits(y=0) + geom_hline(yintercept=0)
+    }
+    g <- g +
 	geom_vline(xintercept=as.numeric(strftime(Sys.time(), format = "%V")), alpha=0.5) +
 	geom_step(data=subset(dat, Year == 2016), alpha=0.25) +
 	geom_step(data=subset(dat, Year == 2017), alpha=0.25) +
@@ -113,6 +212,8 @@ server <- function(input, output) {
 	geom_step(size=1.5, alpha = 0.75) +
         facet_wrap(~AgeGroup, scales = "free_y") +
     theme_minimal_grid()
+
+    g
 
     })
 
