@@ -110,19 +110,23 @@ ui <- fluidPage(
 			   label = "Normalize graphs based on 2015-2019 data"),
       shiny::checkboxInput(inputId = "start_at_zero",
 			   label = "Start y-axis at zero",
-			   value = TRUE)
+			   value = TRUE),
+      shiny::radioButtons(inputId = "year",
+			  choices = c("2020", "2021"),
+			  selected = "2021",
+			  label = "Year")
     ),
 
     mainPanel(
       tabsetPanel(type="tabs",
          tabPanel("Mortality plot",
                   plotOutput(outputId = "distPlot")),
-	 tabPanel("Excess mortality in 2020",
+	 tabPanel("Excess mortality",
                   DTOutput(outputId = "dat"),
-	          "Numbers are showing the difference in the number of deaths in 2020 compared to the average number of deaths in 2015 - 2019"),
+	          "Numbers are showing the difference in the number of deaths compared to the average number of deaths in 2015 - 2019"),
          tabPanel("Data", 
       		shiny::radioButtons(inputId = "year2", label = "Year",
-					 choices=2015:2020), 
+					 choices=2015:2021), 
 		  DTOutput(outputId = "dat2")
 	 )
 	 )
@@ -143,7 +147,7 @@ server <- function(input, output) {
   })
 
   output$dat_info <- renderTable({
-    dat <- subset(stmfi(), Year == 2020)
+    dat <- subset(stmfi(), Year == input$year)
     data.frame(WeekNr=tapply(dat$Week, dat$Country, max))
   }, rownames=TRUE)
 
@@ -167,7 +171,7 @@ server <- function(input, output) {
   })
 
   output$dat <- renderDT({
-    dat <- subset(stmfi(), Year == 2020)
+    dat <- subset(stmfi(), Year == input$year)
 
     #tapply(dat$Deaths, dat$
     dat1 <- plyr::daply(dat, c("AgeGroup", "Country"), function(x) {
@@ -198,7 +202,7 @@ server <- function(input, output) {
         x
       })
     }
-    g <- ggplot(subset(dat, Year == 2020),aes(x=Week, y=Deaths, color = Country))
+    g <- ggplot(subset(dat, Year == input$year),aes(x=Week, y=Deaths, color = Country))
    
     if (input$start_at_zero) {
         g <- g + expand_limits(y=0) + geom_hline(yintercept=0)
