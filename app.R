@@ -79,11 +79,12 @@ all_countries <- unique(stmf$Country)
 
 ui <- fluidPage(
 
-  titlePanel("Weekly mortality data in Europe"),
+  titlePanel("Excess mortality in 2020/2021"),
 
   sidebarLayout(
 
     sidebarPanel(
+		 "Data from ",a("mortality.org", href="https://www.mortality.org/"),
 
       shiny::selectInput(inputId = "country", 
                          label = "Country",
