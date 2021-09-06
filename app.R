@@ -66,12 +66,18 @@ age_map <- c(
 	     "85p" = "Age 85+",
 	     "Total" = "Total")
 
-stmf <- read.csv("stmf.csv", skip = 2, stringsAsFactors = F)
+read_stmf_data <- function(file) {
+  stmf <- read.csv(file, skip = 2, stringsAsFactors = F)
+  stmf <- tidyr::gather(stmf, AgeGroup, Deaths, D0_14:RTotal) 
+  stmf$Type <- substr(stmf$AgeGroup, 0, 1)
+  stmf$AgeGroup <- age_map[sub("^[DR]", "", stmf$AgeGroup)]
+  stmf$Country <- country_map[stmf$CountryCode]
+  return(stmf)
+}
 
-stmf <- tidyr::gather(stmf, AgeGroup, Deaths, D0_14:RTotal) 
-stmf$Type <- substr(stmf$AgeGroup, 0, 1)
-stmf$AgeGroup <- age_map[sub("^[DR]", "", stmf$AgeGroup)]
-stmf$Country <- country_map[stmf$CountryCode]
+
+
+stmf <- read_stmf_data("stmf.csv")
 
 all_age_groups <- unique(stmf$AgeGroup)
 all_countries <- unique(stmf$Country)
